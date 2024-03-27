@@ -23,7 +23,7 @@ type MiddlewareFunction = func(req any) (error)
 
 func AuthMiddleware(_ context.Context, req any) (error) {
     if req.Token != "some-secret-token" {
-    return nil, fmt.Errorf("user not auth'd")
+        return nil, fmt.Errorf("user not auth'd")
     }
 }
 
@@ -119,11 +119,11 @@ We get stuck here. What if we try this:
 ```go
 func executeHandlerWithMiddleware(req any, baseHandler handlerFn, middlewareFunctions []middlewareFn) (any, error) {
     for idx, mw := range middlewareFunctions {
-    if idx == len(middlewareFunctions)-1 {
-    res, err := baseHandler(req)
-    } else {
-    res, err := mw(req, middlewareFunctions[idx+1])
-    }
+        if idx == len(middlewareFunctions)-1 {
+            res, err := baseHandler(req)
+        } else {
+            res, err := mw(req, middlewareFunctions[idx+1])
+        }
     }
 }
 ```
@@ -144,7 +144,7 @@ But this doesn't work, either. `AuthMiddleware` (of type `func(any, handlerFn) (
 ```go
 boundAuthMiddleware := func(handler handlerFn) handlerFn {
     return func(req any) (any, error) {
-    return AuthMiddleware(req, handler)
+        return AuthMiddleware(req, handler)
     }
 }
 ```
@@ -165,7 +165,7 @@ Lets make that wrapper generic:
 ```go
 wrapMiddleware := func(middleware middlewareFn, handler handlerFn) handlerFn {
     return func(req any) (any, error) {
-    return middleware(req, handler)
+        return middleware(req, handler)
     }
 }
 ```
@@ -192,8 +192,8 @@ func TraceMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
 res, err := LogMiddleware(
     req,
     wrapMiddleware(
-    AuthMiddleware,
-    wrapMiddleware(TraceMiddleware, baseFn)
+        AuthMiddleware,
+        wrapMiddleware(TraceMiddleware, baseFn)
     ),
 )
 ```
@@ -235,11 +235,11 @@ This won't recurse, though. It'll run once and not keep iterating through the li
 ```go
 func chainFunction(middleware []middlewareFn, current int) handlerFn {
     return func(req any) (any, error) {
-    currentFunction := middleware[current]
-    return currentFunction(
-    req,
-    chainFunction(middleware, current+1)
-    )
+        currentFunction := middleware[current]
+        return currentFunction(
+            req,
+            chainFunction(middleware, current+1)
+        )
     }
 }
 ```
@@ -251,15 +251,15 @@ This'll quickly run into an out of bounds error, though. What do we want to run 
 ```go
 func chainFunction(middleware []middlewareFn, baseFn handlerFn, current int) handlerFn {
     if current == len(middleware) {
-    return baseFn
+        return baseFn
     }
 
     return func(req any) (any, error) {
-    currentFunction := middleware[current]
-    return currentFunction(
-    req,
-    chainFunction(middleware, current+1)
-    )
+        currentFunction := middleware[current]
+        return currentFunction(
+            req,
+            chainFunction(middleware, current+1)
+        )
     }
 }
 ```
@@ -284,7 +284,7 @@ chainedFunction := chainFunction(middlewareFns, baseFn, 0)
 and it'd all work. But that's a leaky interface, so lets take the `combineMiddlewareAndHandler` function above and call what we've called above in it:
 
 ```go
-function combineMiddlewareAndHandler(middleware []middlewareFn, handler handlerFn) handlerFn {
+func combineMiddlewareAndHandler(middleware []middlewareFn, handler handlerFn) handlerFn {
     return chainFunction(middlewareFns, baseFn, 0)
 }
 ```
@@ -310,7 +310,7 @@ func LogMiddleware(req any, handler handlerFn) (any, error) {
 func AuthMiddleware(req any, handler handlerFn) (any, error) {
     fmt.Println("Hit auth middleware")
     if false {
-    return nil, fmt.Errorf("user not auth'd")
+        return nil, fmt.Errorf("user not auth'd")
     }
     return handler(req)
 }
