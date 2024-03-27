@@ -1,13 +1,15 @@
 # Go gRPC interceptors under the hood
 
-The Go gRPC interceptor system is kind of neat. You hand it a list of functions, and it'll convert them into an onion of functions that are executed on each request. At first glance, it's easy to assume that it's a just list of functions that are executed in order, but it's more nuanced than that. 
+The Go gRPC interceptor system is kind of neat. You hand it a list of functions, and it'll convert them into an onion of functions that are executed on each request. At first glance, it's easy to assume that it's a just list of functions that are executed in order, but it's more nuanced than that.
 
 Lets look at the simplest possible interceptor:
+
 ```go
 func emptyInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	return handler(ctx, req)
 }
 ```
+
 All this does is run the handler that's passed into it. Conceptually it can be thought of as:
 
 ```
@@ -20,14 +22,14 @@ Lets say you're building a middleware handler from scratch. The simple usecase t
 type MiddlewareFunction = func(req any) (error)
 
 func AuthMiddleware(_ context.Context, req any) (error) {
-    if req.Token != "some-secret-token" {
-        return nil, fmt.Errorf("user not auth'd")
-    }
+	if req.Token != "some-secret-token" {
+		return nil, fmt.Errorf("user not auth'd")
+	}
 }
 
 func AddLog(req any) (error) {
-    logger.Info("=== Got request: ", req)
-    return nil
+	logger.Info("=== Got request: ", req)
+	return nil
 }
 ```
 
@@ -42,7 +44,7 @@ func executeRequest(req any, handler handlerFunc, middleware []MiddlewareFunc) (
             return nil, err
         }
     }
-    
+
     return handler(req)
 }
 ```
@@ -52,6 +54,7 @@ This is fine for really simple usecases, but what if we want to add tracing? Wha
 ## Interceptor
 
 If we look at the function signature for a gRPC interceptor, it hints at how it should be used:
+
 ```go
 func emptyInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error)
 ```
@@ -66,15 +69,15 @@ Take in a `req` and `handler`, return `any` (response) or an error. What's the b
 
 ```go
 func LogMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-    log.Info("=== Got request:", req)
+	log.Info("=== Got request:", req)
 	return handler(ctx, req)
 }
 
 func AuthMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-    if req.Token != "some-secret-token" {
-        return nil, fmt.Errorf("user not auth'd")
-    }
-    return handler(ctx, req)
+	if req.Token != "some-secret-token" {
+		return nil, fmt.Errorf("user not auth'd")
+	}
+	return handler(ctx, req)
 }
 ```
 
@@ -82,11 +85,11 @@ But this _also_ lets you do some neat things like:
 
 ```go
 func LogMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-    start := time.Now()
-    log.Info("=== Got request:", req)
-    res, err := handler(ctx, req)
-    log.Infof("=== Completed request, took %s seconds", time.Since(start))
-    
+	start := time.Now()
+	log.Info("=== Got request:", req)
+	res, err := handler(ctx, req)
+	log.Infof("=== Completed request, took %s seconds", time.Since(start))
+
 	return res, err
 }
 ```
@@ -110,6 +113,7 @@ func executeHandlerWithMiddleware(req any, baseHandler handlerFn, middlewareFunc
 }
 
 ```
+
 We get stuck here. What if we try this:
 
 ```go
@@ -130,10 +134,11 @@ We're going to need a different approach. What if we could wrap the functions ov
 
 ```go
 res, err := LoggerMiddleware(
-    req,
-    AuthMiddleware
+	req,
+	AuthMiddleware
 )
 ```
+
 But this doesn't work, either. `AuthMiddleware` (of type `func(any, handlerFn) (any, error)` is the wrong type. It's expecting something of `func(any) (any, error)` (aka `handlerFn`). What if we could 'bind' `AuthMiddleware` to whatever the next function should be? Let's try that:
 
 ```go
@@ -178,18 +183,18 @@ Lets add another piece of middleware and see how it fits in:
 
 ```go
 func TraceMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-    trace.Start()
-    res, err := handler(ctx, req)
-    trace.End()
+	trace.Start()
+	res, err := handler(ctx, req)
+	trace.End()
 	return res, err
 }
 
 res, err := LogMiddleware(
 	req,
 	wrapMiddleware(
-	    AuthMiddleware,
-	    wrapMiddleware(TraceMiddleware, baseFn)
-    ),
+		AuthMiddleware,
+		wrapMiddleware(TraceMiddleware, baseFn)
+	),
 )
 ```
 
@@ -197,15 +202,15 @@ It seems like we're getting deeper and deeper as we add more middleware, we'll c
 
 ```go
 middlewareFns := middlewareFn{
-    LogMiddleware,
-    AuthMiddleware,
-    TraceMiddleware,
+	LogMiddleware,
+	AuthMiddleware,
+	TraceMiddleware,
 }
 
 // A sample baseFn that just returns the request
 baseFn := func(req any) (any, error) {
-    fmt.Println("Got to the base function")
-    return req, nil
+	fmt.Println("Got to the base function")
+	return req, nil
 }
 ```
 
@@ -214,70 +219,73 @@ How can we combine the various middleware functions _and_ the `baseFn` into a si
 We know that we'll likely need a function that takes in both and returns a `handlerFn`, so lets start with that:
 
 ```go
-function combineMiddlewareAndHandler(middleware []middlewareFn, handler handlerFn) handlerFn {}
+func combineMiddlewareAndHandler(middleware []middlewareFn, handler handlerFn) handlerFn {}
 ```
 
 We saw above that as we added more middleware, the function calls got deeper. This hints at the need for some recursion. Lets add something to chain the current function with the next one. We'll need to keep track of _some_ index to know which is the current function, and which is the next function:
 
 ```go
-function chainFunction(middleware []middlewareFn, current int) handlerFn {
-    return wrapMiddleware(middleware[current], middleware[current+1])
+func chainFunction(middleware []middlewareFn, current int) handlerFn {
+	return wrapMiddleware(middleware[current], middleware[current+1])
 }
 ```
 
 This won't recurse, though. It'll run once and not keep iterating through the list of middleware. Lets reimplement `wrapMiddleware`
 
 ```go
-function chainFunction(middleware []middlewareFn, current int) handlerFn {
-    return func(req any) (any, error) {
-        currentFunction := middleware[current]
-        return currentFunction(
-            req,
-            chainFunction(middleware, current+1)
-        )
-    }
+func chainFunction(middleware []middlewareFn, current int) handlerFn {
+	return func(req any) (any, error) {
+		currentFunction := middleware[current]
+		return currentFunction(
+			req,
+			chainFunction(middleware, current+1)
+		)
+	}
 }
 ```
+
 Note that this is nearly identical to what we were doing above when we first wrote `wrapMiddleware`.
 
 This'll quickly run into an out of bounds error, though. What do we want to run on the last iteration? The `baseFn`, of course! Lets add some guards in:
 
 ```go
-function chainFunction(middleware []middlewareFn, baseFn handlerFn, current int) handlerFn {
+func chainFunction(middleware []middlewareFn, baseFn handlerFn, current int) handlerFn {
 	if current == len(middleware) {
 		return baseFn
 	}
 
-    return func(req any) (any, error) {
-        currentFunction := middleware[current]
-        return currentFunction(
-            req,
-            chainFunction(middleware, current+1)
-        )
-    }
+	return func(req any) (any, error) {
+		currentFunction := middleware[current]
+	  return currentFunction(
+	  	req,
+	   chainFunction(middleware, current+1)
+	  )
+	}
 }
 ```
 
 At this point, we could just run:
+
 ```go
 middlewareFns := middlewareFn{
-    LogMiddleware,
-    AuthMiddleware,
-    TraceMiddleware,
+	LogMiddleware,
+	AuthMiddleware,
+	TraceMiddleware,
 }
 
 baseFn := func(req any) (any, error) {
-    fmt.Println("Got to the base function")
-    return req, nil
+	fmt.Println("Got to the base function")
+	return req, nil
 }
 
 chainedFunction := chainFunction(middlewareFns, baseFn, 0)
 ```
+
 and it'd all work. But that's a leaky interface, so lets take the `combineMiddlewareAndHandler` function above and call what we've called above in it:
 
 ```go
 function combineMiddlewareAndHandler(middleware []middlewareFn, handler handlerFn) handlerFn {
-    return chainFunction(middlewareFns, baseFn, 0)
+	return chainFunction(middlewareFns, baseFn, 0)
 }
 ```
 
@@ -342,6 +350,4 @@ Got res from the chained functions: hello
 
 It works! It might not look like much, but we've just implemented a basic version of `grpc-go`'s middleware functionality.
 
-If you look at the [grpc-go](https://github.com/grpc/grpc-go/blob/v1.62.1/server.go#L1198) source, this is effectively what they have! 
-
-
+If you look at the [grpc-go](https://github.com/grpc/grpc-go/blob/v1.62.1/server.go#L1198) source, this is effectively what they have!
