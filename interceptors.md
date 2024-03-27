@@ -6,7 +6,7 @@ Lets look at the simplest possible interceptor:
 
 ```go
 func emptyInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	return handler(ctx, req)
+    return handler(ctx, req)
 }
 ```
 
@@ -22,14 +22,14 @@ Lets say you're building a middleware handler from scratch. The simple usecase t
 type MiddlewareFunction = func(req any) (error)
 
 func AuthMiddleware(_ context.Context, req any) (error) {
-	if req.Token != "some-secret-token" {
-		return nil, fmt.Errorf("user not auth'd")
-	}
+    if req.Token != "some-secret-token" {
+    return nil, fmt.Errorf("user not auth'd")
+    }
 }
 
 func AddLog(req any) (error) {
-	logger.Info("=== Got request: ", req)
-	return nil
+    logger.Info("=== Got request: ", req)
+    return nil
 }
 ```
 
@@ -69,15 +69,15 @@ Take in a `req` and `handler`, return `any` (response) or an error. What's the b
 
 ```go
 func LogMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-	log.Info("=== Got request:", req)
-	return handler(ctx, req)
+    log.Info("=== Got request:", req)
+    return handler(ctx, req)
 }
 
 func AuthMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-	if req.Token != "some-secret-token" {
-		return nil, fmt.Errorf("user not auth'd")
-	}
-	return handler(ctx, req)
+    if req.Token != "some-secret-token" {
+        return nil, fmt.Errorf("user not auth'd")
+    }
+    return handler(ctx, req)
 }
 ```
 
@@ -85,12 +85,12 @@ But this _also_ lets you do some neat things like:
 
 ```go
 func LogMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-	start := time.Now()
-	log.Info("=== Got request:", req)
-	res, err := handler(ctx, req)
-	log.Infof("=== Completed request, took %s seconds", time.Since(start))
+    start := time.Now()
+    log.Info("=== Got request:", req)
+    res, err := handler(ctx, req)
+    log.Infof("=== Completed request, took %s seconds", time.Since(start))
 
-	return res, err
+    return res, err
 }
 ```
 
@@ -118,13 +118,13 @@ We get stuck here. What if we try this:
 
 ```go
 func executeHandlerWithMiddleware(req any, baseHandler handlerFn, middlewareFunctions []middlewareFn) (any, error) {
-	for idx, mw := range middlewareFunctions {
-		if idx == len(middlewareFunctions)-1 {
-			res, err := baseHandler(req)
-		} else {
-			res, err := mw(req, middlewareFunctions[idx+1])
-		}
-	}
+    for idx, mw := range middlewareFunctions {
+    if idx == len(middlewareFunctions)-1 {
+    res, err := baseHandler(req)
+    } else {
+    res, err := mw(req, middlewareFunctions[idx+1])
+    }
+    }
 }
 ```
 
@@ -134,8 +134,8 @@ We're going to need a different approach. What if we could wrap the functions ov
 
 ```go
 res, err := LoggerMiddleware(
-	req,
-	AuthMiddleware
+    req,
+    AuthMiddleware
 )
 ```
 
@@ -143,9 +143,9 @@ But this doesn't work, either. `AuthMiddleware` (of type `func(any, handlerFn) (
 
 ```go
 boundAuthMiddleware := func(handler handlerFn) handlerFn {
-	return func(req any) (any, error) {
-		return AuthMiddleware(req, handler)
-	}
+    return func(req any) (any, error) {
+    return AuthMiddleware(req, handler)
+    }
 }
 ```
 
@@ -155,8 +155,8 @@ Now we're getting somewhere. The code below fits the expected shape.
 
 ```go
 res, err := LogMiddleware(
-	req,
-	wrappedAuthMiddleware(baseFn),
+    req,
+    wrappedAuthMiddleware(baseFn),
 )
 ```
 
@@ -164,9 +164,9 @@ Lets make that wrapper generic:
 
 ```go
 wrapMiddleware := func(middleware middlewareFn, handler handlerFn) handlerFn {
-	return func(req any) (any, error) {
-		return middleware(req, handler)
-	}
+    return func(req any) (any, error) {
+    return middleware(req, handler)
+    }
 }
 ```
 
@@ -174,8 +174,8 @@ Now we can run:
 
 ```go
 res, err := LogMiddleware(
-	req,
-	wrapMiddleware(AuthMiddleware, baseFn),
+    req,
+    wrapMiddleware(AuthMiddleware, baseFn),
 )
 ```
 
@@ -183,18 +183,18 @@ Lets add another piece of middleware and see how it fits in:
 
 ```go
 func TraceMiddleware(req any, handler grpc.UnaryHandler) (any, error) {
-	trace.Start()
-	res, err := handler(ctx, req)
-	trace.End()
-	return res, err
+    trace.Start()
+    res, err := handler(ctx, req)
+    trace.End()
+    return res, err
 }
 
 res, err := LogMiddleware(
-	req,
-	wrapMiddleware(
-		AuthMiddleware,
-		wrapMiddleware(TraceMiddleware, baseFn)
-	),
+    req,
+    wrapMiddleware(
+    AuthMiddleware,
+    wrapMiddleware(TraceMiddleware, baseFn)
+    ),
 )
 ```
 
@@ -202,15 +202,15 @@ It seems like we're getting deeper and deeper as we add more middleware, we'll c
 
 ```go
 middlewareFns := middlewareFn{
-	LogMiddleware,
-	AuthMiddleware,
-	TraceMiddleware,
+    LogMiddleware,
+    AuthMiddleware,
+    TraceMiddleware,
 }
 
 // A sample baseFn that just returns the request
 baseFn := func(req any) (any, error) {
-	fmt.Println("Got to the base function")
-	return req, nil
+    fmt.Println("Got to the base function")
+    return req, nil
 }
 ```
 
@@ -226,7 +226,7 @@ We saw above that as we added more middleware, the function calls got deeper. Th
 
 ```go
 func chainFunction(middleware []middlewareFn, current int) handlerFn {
-	return wrapMiddleware(middleware[current], middleware[current+1])
+    return wrapMiddleware(middleware[current], middleware[current+1])
 }
 ```
 
@@ -234,13 +234,13 @@ This won't recurse, though. It'll run once and not keep iterating through the li
 
 ```go
 func chainFunction(middleware []middlewareFn, current int) handlerFn {
-	return func(req any) (any, error) {
-		currentFunction := middleware[current]
-		return currentFunction(
-			req,
-			chainFunction(middleware, current+1)
-		)
-	}
+    return func(req any) (any, error) {
+    currentFunction := middleware[current]
+    return currentFunction(
+    req,
+    chainFunction(middleware, current+1)
+    )
+    }
 }
 ```
 
@@ -250,17 +250,17 @@ This'll quickly run into an out of bounds error, though. What do we want to run 
 
 ```go
 func chainFunction(middleware []middlewareFn, baseFn handlerFn, current int) handlerFn {
-	if current == len(middleware) {
-		return baseFn
-	}
+    if current == len(middleware) {
+    return baseFn
+    }
 
-	return func(req any) (any, error) {
-		currentFunction := middleware[current]
-	  return currentFunction(
-	  	req,
-	   chainFunction(middleware, current+1)
-	  )
-	}
+    return func(req any) (any, error) {
+    currentFunction := middleware[current]
+    return currentFunction(
+    req,
+    chainFunction(middleware, current+1)
+    )
+    }
 }
 ```
 
@@ -268,14 +268,14 @@ At this point, we could just run:
 
 ```go
 middlewareFns := middlewareFn{
-	LogMiddleware,
-	AuthMiddleware,
-	TraceMiddleware,
+    LogMiddleware,
+    AuthMiddleware,
+    TraceMiddleware,
 }
 
 baseFn := func(req any) (any, error) {
-	fmt.Println("Got to the base function")
-	return req, nil
+    fmt.Println("Got to the base function")
+    return req, nil
 }
 
 chainedFunction := chainFunction(middlewareFns, baseFn, 0)
@@ -285,7 +285,7 @@ and it'd all work. But that's a leaky interface, so lets take the `combineMiddle
 
 ```go
 function combineMiddlewareAndHandler(middleware []middlewareFn, handler handlerFn) handlerFn {
-	return chainFunction(middlewareFns, baseFn, 0)
+    return chainFunction(middlewareFns, baseFn, 0)
 }
 ```
 
@@ -296,42 +296,42 @@ type middlewareFn = func(req any, handler handlerFn) (any, error)
 type handlerFn = func(req any) (any, error)
 
 func TraceMiddleware(req any, handler handlerFn) (any, error) {
-	fmt.Println("Starting trace")
-	res, err := handler(req)
-	fmt.Println("Ending trace")
-	return res, err
+    fmt.Println("Starting trace")
+    res, err := handler(req)
+    fmt.Println("Ending trace")
+    return res, err
 }
 
 func LogMiddleware(req any, handler handlerFn) (any, error) {
-	fmt.Println("Hit log middleware")
-	return handler(req)
+    fmt.Println("Hit log middleware")
+    return handler(req)
 }
 
 func AuthMiddleware(req any, handler handlerFn) (any, error) {
-	fmt.Println("Hit auth middleware")
-	if false {
-		return nil, fmt.Errorf("user not auth'd")
-	}
-	return handler(req)
+    fmt.Println("Hit auth middleware")
+    if false {
+    return nil, fmt.Errorf("user not auth'd")
+    }
+    return handler(req)
 }
 
 baseFn := func(req any) (any, error) {
-	fmt.Println("Made it to the base function")
-	return req, nil
+    fmt.Println("Made it to the base function")
+    return req, nil
 }
 
 middlewareFunctions := []middlewareFn{
-	LogMiddleware,
-	AuthMiddleware,
-	TraceMiddleware,
+    LogMiddleware,
+    AuthMiddleware,
+    TraceMiddleware,
 }
 
 chainedFunction := combineMiddlewareAndHandler(middlewareFunctions, baseFn)
 
 res, err := chainedFunction("hello")
 if err != nil {
-	fmt.Println("Got err from the chained functions:", err)
-	return
+    fmt.Println("Got err from the chained functions:", err)
+    return
 }
 
 fmt.Println("Got res from the chained functions:", res)
