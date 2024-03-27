@@ -1,4 +1,4 @@
-# Interceptors under the hood
+# Go gRPC interceptors under the hood
 
 The Go gRPC interceptor system is kind of neat. You hand it a list of functions, and it'll convert them into an onion of functions that are executed on each request. At first glance, it's easy to assume that it's a just list of functions that are executed in order, but it's more nuanced than that. 
 
